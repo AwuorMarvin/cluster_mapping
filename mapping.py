@@ -3,9 +3,7 @@ import pandas as pd
 import pydeck as pdk
 
 def check_password():
-    """Returns `True` if the user had the correct password."""
     def password_entered():
-        """Checks whether a password entered by the user is correct."""
         if st.session_state["password"] == st.secrets["passwords"]["app_password"]:
             st.session_state["password_correct"] = True
             del st.session_state["password"]
@@ -25,12 +23,8 @@ def check_password():
 if not check_password():
     st.stop()
 
-# Your existing app code continues here...
-
-# Set page configuration to wide mode for full-screen usage
 st.set_page_config(layout="wide")
 
-# Add custom CSS to make the map fill the main panel, reduce footer gap, and style dropdown options
 st.markdown(
     """
     <style>
@@ -92,10 +86,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Load the CSV
-df = pd.read_csv("cluster_data.csv")  # replace with your file
+df = pd.read_csv("cluster_data.csv")  
 
-# Add Syokimau DC legend in the sidebar above the territory filter
 st.sidebar.markdown(
     """
     <div class="legend-container">
@@ -106,53 +98,44 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-# Sidebar territory filter
 territories = df["territory name"].unique().tolist()
 selected_territories = st.sidebar.multiselect("Select Territory", territories, default=territories)
 
-# Filter data by selected territories
 filtered_df = df[df["territory name"].isin(selected_territories)]
 
-# Sidebar cluster filter (dynamic based on selected territories)
 clusters = filtered_df["cluster name"].unique().tolist()
 selected_clusters = st.sidebar.multiselect("Select Cluster", clusters, default=clusters)
 
-# Further filter data by selected clusters
 filtered_df = filtered_df[filtered_df["cluster name"].isin(selected_clusters)]
 
-# Decide coloring logic
 if len(selected_territories) == 1:
     color_column = "cluster name"
 else:
     color_column = "territory name"
 
-# Define a fixed color palette (max 12 unique values)
 preset_colors = [
-    [255, 99, 132],   # Red
-    [54, 162, 235],   # Blue
-    [255, 206, 86],   # Yellow
-    [75, 192, 192],   # Teal
-    [153, 102, 255],  # Purple
-    [255, 159, 64],   # Orange
-    [199, 199, 199],  # Gray
-    [83, 102, 255],   # Indigo
-    [0, 204, 102],    # Green
-    [255, 51, 153],   # Pink
-    [102, 255, 255],  # Cyan
-    [153, 255, 51],   # Lime
+    [255, 99, 132],   
+    [54, 162, 235],   
+    [255, 206, 86],   
+    [75, 192, 192],   
+    [153, 102, 255],  
+    [255, 159, 64],   
+    [199, 199, 199],  
+    [83, 102, 255],   
+    [0, 204, 102],    
+    [255, 51, 153],   
+    [102, 255, 255],  
+    [153, 255, 51],   
 ]
 
-# Map unique color_column values to a color
 unique_values = filtered_df[color_column].unique()
 color_palette = {
     name: preset_colors[i % len(preset_colors)]
     for i, name in enumerate(unique_values)
 }
 
-# Apply color to DataFrame
 filtered_df["color"] = filtered_df[color_column].map(color_palette)
 
-# Create a DataFrame for Syokimau DC (independent of filters)
 syokimau_data = pd.DataFrame({
     "name": ["Syokimau DC"],
     "longitude": [36.91971405524983],
@@ -164,24 +147,21 @@ syokimau_data = pd.DataFrame({
     "territory name": ["Syokimau"]
 })
 
-# Prepare Pydeck layer for Syokimau DC red dot (always displayed)
 syokimau_scatter_layer = pdk.Layer(
     "ScatterplotLayer",
     data=syokimau_data,
     get_position='[longitude, latitude]',
     get_fill_color="color",
-    get_radius=300,  # Even larger red dot to ensure visibility
+    get_radius=300, 
     pickable=True,
     stroked=True,
     filled=True,
-    get_line_color=[255, 255, 255],  # White outline
+    get_line_color=[255, 255, 255], 
     get_line_width=3,
 )
 
-# Initialize layers list - shop data first, then Syokimau DC on top
 deck_layers = []
 
-# Add shop data layer only if there's filtered data
 if not filtered_df.empty:
     scatter_layer = pdk.Layer(
         "ScatterplotLayer",
@@ -194,10 +174,8 @@ if not filtered_df.empty:
     )
     deck_layers.append(scatter_layer)
 
-# Always add Syokimau DC layer on top (so it's always visible)
 deck_layers.append(syokimau_scatter_layer)
 
-# Set map view, using Syokimau DC coordinates as fallback if filtered_df is empty
 view_state = pdk.ViewState(
     latitude=filtered_df["latitude"].mean() if not filtered_df.empty else 1.362519418250539,
     longitude=filtered_df["longitude"].mean() if not filtered_df.empty else 36.91971405524983,
@@ -205,7 +183,6 @@ view_state = pdk.ViewState(
     pitch=0,
 )
 
-# Create the deck with all layers
 deck = pdk.Deck(
     map_style='mapbox://styles/mapbox/light-v9',
     layers=deck_layers,
@@ -224,7 +201,6 @@ deck = pdk.Deck(
     }
 )
 
-# Wrap the map in a container to fill the main panel
 with st.container():
     if filtered_df.empty:
         st.info("No shop data matches your current selection. Displaying Syokimau DC for reference.")
