@@ -188,7 +188,7 @@ import os
 os.environ['MAPBOX_API_KEY'] = st.secrets["mapbox"]["token"]
 
 deck = pdk.Deck(
-    map_style='mapbox://styles/mapbox/light-v9',
+    map_style='mapbox://styles/mapbox/streets-v11',  # Google Maps-like style
     layers=deck_layers,
     initial_view_state=view_state,
     tooltip={
