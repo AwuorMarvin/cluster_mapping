@@ -183,8 +183,9 @@ view_state = pdk.ViewState(
     pitch=0,
 )
 
-# Set Mapbox token using pydeck's correct method
-pdk.set_mapbox_access_token(st.secrets["mapbox"]["token"])
+# Set Mapbox token via environment variable (most reliable method)
+import os
+os.environ['MAPBOX_API_KEY'] = st.secrets["mapbox"]["token"]
 
 deck = pdk.Deck(
     map_style='mapbox://styles/mapbox/light-v9',
