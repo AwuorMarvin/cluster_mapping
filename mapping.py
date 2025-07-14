@@ -183,10 +183,14 @@ view_state = pdk.ViewState(
     pitch=0,
 )
 
+# Get Mapbox token from secrets
+mapbox_token = st.secrets["mapbox"]["token"]
+
 deck = pdk.Deck(
     map_style='mapbox://styles/mapbox/light-v9',
     layers=deck_layers,
     initial_view_state=view_state,
+    mapbox_key=mapbox_token,  # Add the Mapbox token here
     tooltip={
         "html": """
         <b>Shop:</b> {shop_name}<br/>
