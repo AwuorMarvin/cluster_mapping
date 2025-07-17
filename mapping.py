@@ -71,15 +71,52 @@ st.markdown(
         border-radius: 50%;
         margin-right: 8px;
     }
-    /* Style for individual options in multiselect dropdowns */
-    div[data-testid="stMultiSelect"] div[role="option"] {
-        background-color: #002060 !important;
-        color: #FFFFFF !important; /* White text for options */
+    /* Style for hierarchical checkboxes */
+    .territory-checkbox {
+        font-weight: bold;
+        margin-bottom: 5px;
+        background-color: #f0f2f6;
+        padding: 8px;
+        border-radius: 4px;
+        border-left: 4px solid #1f77b4;
     }
-    /* Ensure selected options also have the same background */
-    div[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
-        background-color: #002060 !important;
-        color: #FFFFFF !important; /* White text for selected tags */
+    .cluster-checkbox {
+        margin-left: 20px;
+        margin-bottom: 3px;
+        font-size: 0.9em;
+        padding: 4px 8px;
+        background-color: #ffffff;
+        border-radius: 3px;
+        border-left: 2px solid #cccccc;
+    }
+    .checkbox-container {
+        margin-bottom: 15px;
+    }
+    /* Custom styling for form checkboxes */
+    .stForm .stCheckbox {
+        margin-bottom: 8px;
+    }
+    .stForm .stCheckbox > label {
+        font-size: 0.9em;
+    }
+    /* Territory checkbox styling */
+    .territory-cb {
+        font-weight: bold;
+        background-color: #f0f2f6;
+        padding: 8px;
+        border-radius: 4px;
+        margin-bottom: 5px;
+        border-left: 4px solid #1f77b4;
+    }
+    /* Cluster checkbox styling */
+    .cluster-cb {
+        margin-left: 30px;
+        padding: 4px 8px;
+        background-color: #fafafa;
+        border-radius: 3px;
+        margin-bottom: 3px;
+        border-left: 2px solid #cccccc;
+        font-size: 0.85em;
     }
     </style>
     """,
@@ -87,6 +124,14 @@ st.markdown(
 )
 
 df = pd.read_csv("cluster_data.csv")  
+
+# Initialize session state for applied selections only
+if "applied_territories" not in st.session_state:
+    st.session_state.applied_territories = set()
+if "applied_clusters" not in st.session_state:
+    st.session_state.applied_clusters = set()
+if "map_data" not in st.session_state:
+    st.session_state.map_data = df  # Start with all data
 
 st.sidebar.markdown(
     """
@@ -98,17 +143,96 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-territories = df["territory name"].unique().tolist()
-selected_territories = st.sidebar.multiselect("Select Territory", territories, default=territories)
+# Create hierarchical selection interface using form
+st.sidebar.subheader("Select Territories and Clusters")
 
-filtered_df = df[df["territory name"].isin(selected_territories)]
+with st.sidebar.form("territory_cluster_form"):
+    territories = df["territory name"].dropna().unique().tolist()
+    territory_clusters = {}
 
-clusters = filtered_df["cluster name"].unique().tolist()
-selected_clusters = st.sidebar.multiselect("Select Cluster", clusters, default=clusters)
+    # Group clusters by territory
+    for territory in territories:
+        territory_clusters[territory] = df[df["territory name"] == territory]["cluster name"].dropna().unique().tolist()
 
-filtered_df = filtered_df[filtered_df["cluster name"].isin(selected_clusters)]
+    # Store current selections
+    selected_territories = set()
+    selected_clusters = set()
+    
+    # Create hierarchical checkboxes
+    for territory in territories:
+        # Skip if territory is None or empty
+        if not territory or pd.isna(territory):
+            continue
+            
+        clusters_in_territory = territory_clusters[territory]
+        
+        # Territory checkbox with bold styling
+        st.markdown(f"**🏘️ {str(territory)}**")
+        territory_selected = st.checkbox(
+            f"Select all in {str(territory)}",
+            key=f"territory_{territory}",
+            value=territory in st.session_state.applied_territories
+        )
+        
+        if territory_selected:
+            selected_territories.add(territory)
+            # Auto-select all clusters in this territory
+            for cluster in clusters_in_territory:
+                if cluster and not pd.isna(cluster):
+                    selected_clusters.add(cluster)
+        
+        # Add some spacing and indentation for clusters
+        st.markdown("---")  # Separator line
+        
+        # Cluster checkboxes (indented)
+        for cluster in clusters_in_territory:
+            # Skip if cluster is None or empty
+            if not cluster or pd.isna(cluster):
+                continue
+                
+            # Auto-check cluster if territory is selected, otherwise use current applied state
+            cluster_default = (territory_selected or cluster in st.session_state.applied_clusters)
+            
+            # Add indentation using columns
+            col1, col2 = st.columns([1, 10])
+            with col1:
+                st.write("")  # Empty space for indentation
+            with col2:
+                cluster_selected = st.checkbox(
+                    f"📍 {str(cluster)}",
+                    key=f"cluster_{cluster}",
+                    value=cluster_default
+                )
+            
+            # Only add to selected if explicitly checked or territory is selected
+            if cluster_selected or territory_selected:
+                selected_clusters.add(cluster)
+        
+        # Add spacing between territories
+        st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Submit button
+    submitted = st.form_submit_button("Update Map", type="primary")
+    
+    if submitted:
+        # Apply selections to map data
+        st.session_state.applied_territories = selected_territories.copy()
+        st.session_state.applied_clusters = selected_clusters.copy()
+        
+        # Filter data based on applied selections
+        if st.session_state.applied_clusters:
+            filtered_df = df[df["cluster name"].isin(st.session_state.applied_clusters)]
+        else:
+            filtered_df = pd.DataFrame()  # Empty dataframe if nothing selected
+        
+        st.session_state.map_data = filtered_df
+        st.rerun()  # Force a rerun to update the map
 
-if len(selected_territories) == 1:
+# Use the data from session state
+filtered_df = st.session_state.map_data
+
+# Determine coloring logic based on applied selections
+if len(st.session_state.applied_territories) == 1:
     color_column = "cluster name"
 else:
     color_column = "territory name"
@@ -128,14 +252,15 @@ preset_colors = [
     [153, 255, 51],   
 ]
 
-unique_values = filtered_df[color_column].unique()
-color_palette = {
-    name: preset_colors[i % len(preset_colors)]
-    for i, name in enumerate(unique_values)
-}
+if not filtered_df.empty:
+    unique_values = filtered_df[color_column].unique()
+    color_palette = {
+        name: preset_colors[i % len(preset_colors)]
+        for i, name in enumerate(unique_values)
+    }
+    filtered_df["color"] = filtered_df[color_column].map(color_palette)
 
-filtered_df["color"] = filtered_df[color_column].map(color_palette)
-
+# Syokimau DC data (always shown)
 syokimau_data = pd.DataFrame({
     "name": ["Syokimau DC"],
     "longitude": [36.91971405524983],
